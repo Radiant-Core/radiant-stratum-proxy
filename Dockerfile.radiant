@@ -1,0 +1,98 @@
+# Multi-stage build for Radiant Node
+# Builds radiantd and radiant-cli from source
+
+# =============================================================================
+# Stage 1: Build from source
+# =============================================================================
+FROM ubuntu:24.04 AS builder
+
+# Install build dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    cmake \
+    ninja-build \
+    git \
+    pkg-config \
+    libboost-all-dev \
+    libevent-dev \
+    libssl-dev \
+    libdb++-dev \
+    libminiupnpc-dev \
+    libzmq3-dev \
+    help2man \
+    && rm -rf /var/lib/apt/lists/*
+
+# Clone Radiant Core repository
+ARG RADIANT_VERSION=main
+RUN git clone --depth 1 --branch ${RADIANT_VERSION} \
+    https://github.com/Radiant-Core/Radiant-Core.git /radiant-src
+
+# Build Radiant (without Qt GUI)
+WORKDIR /radiant-src
+RUN mkdir build && cd build && \
+    cmake -GNinja .. \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DBUILD_RADIANT_QT=OFF \
+        -DBUILD_RADIANT_WALLET=ON \
+        -DBUILD_RADIANT_ZMQ=ON && \
+    ninja
+
+# =============================================================================
+# Stage 2: Runtime image
+# =============================================================================
+FROM ubuntu:24.04 AS runtime
+
+# Install only runtime dependencies (much smaller than build deps)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libssl3 \
+    libboost-system1.83.0 \
+    libboost-filesystem1.83.0 \
+    libboost-thread1.83.0 \
+    libboost-chrono1.83.0 \
+    libboost-program-options1.83.0 \
+    libevent-2.1-7 \
+    libevent-pthreads-2.1-7 \
+    libzmq5 \
+    libdb5.3++ \
+    libminiupnpc17 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create radiant user and directories
+RUN useradd -r -m -s /bin/bash radiant && \
+    mkdir -p /opt/radiant/bin && \
+    mkdir -p /home/radiant/.radiant && \
+    chown -R radiant:radiant /home/radiant/.radiant
+
+# Copy built binaries from builder stage
+COPY --from=builder /radiant-src/build/src/radiantd /opt/radiant/bin/
+COPY --from=builder /radiant-src/build/src/radiant-cli /opt/radiant/bin/
+COPY --from=builder /radiant-src/build/src/radiant-tx /opt/radiant/bin/
+
+# Copy entrypoint and health check scripts
+COPY entrypoint-radiant.sh /usr/local/bin/entrypoint.sh
+COPY health-check-radiant.sh /usr/local/bin/health-check.sh
+
+# Set permissions and create symlinks
+RUN chmod +x /opt/radiant/bin/* && \
+    chmod +x /usr/local/bin/entrypoint.sh && \
+    chmod +x /usr/local/bin/health-check.sh && \
+    ln -s /opt/radiant/bin/radiantd /usr/local/bin/radiantd && \
+    ln -s /opt/radiant/bin/radiant-cli /usr/local/bin/radiant-cli && \
+    ln -s /opt/radiant/bin/radiant-tx /usr/local/bin/radiant-tx
+
+# Verify binaries work
+RUN radiantd --version && radiant-cli --version
+
+# Set working directory
+WORKDIR /home/radiant
+
+# Expose ports (RPC, P2P, ZMQ)
+EXPOSE 7332 7333 29332 29333
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD /usr/local/bin/health-check.sh || exit 1
+
+# Use entrypoint script to generate config and start daemon
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
+CMD []

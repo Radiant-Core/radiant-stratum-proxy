@@ -1,0 +1,16 @@
+[bandit]
+# Configuration file for Bandit security scanner
+# See: https://bandit.readthedocs.io/en/latest/configuration/index.html
+
+exclude_dirs = ['/tests', '/test', '/.venv', '/venv', '.git']
+tests = 
+skips = B104,B311
+
+# Suppress B104 (hardcoded_bind_all_interfaces)
+# 0.0.0.0 is intentional for server services (stratum proxy, dashboard)
+# These are server-side network services, not client connections
+# Binding to all interfaces is the correct behavior for public-facing services
+#
+# Suppress B311 (blacklist_random)
+# Used only for backoff jitter timing, not cryptographic purposes
+# Safe for non-security use cases 
