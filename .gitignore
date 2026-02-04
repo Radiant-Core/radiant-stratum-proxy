@@ -32,12 +32,15 @@ submit_history/
 logs/
 
 # Database files (keep schema, ignore data)
-data/*.db
-data/*.db-shm
-data/*.db-wal
+data/mainnet/*.db
+data/mainnet/*.db-shm
+data/mainnet/*.db-wal
+data/testnet/*.db
+data/testnet/*.db-shm
+data/testnet/*.db-wal
 
 # Docker volumes data
-radiant-data/
+
 
 # IDE
 .vscode/
@@ -77,6 +80,5 @@ debug_*.txt
 tmp/
 temp/
 *.tmp
-data/vardiff_state.json
+**/vardiff_state.json
 cleanup_confirmations.py
-data/testnet/mining.db

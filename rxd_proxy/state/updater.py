@@ -138,8 +138,10 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
                 if _vardiff_mod.vardiff_manager is not None:
                     sess_diff = getattr(sess, "_share_difficulty", None)
                     if sess_diff is None or sess_diff <= 0:
-                        setattr(sess, "_share_difficulty", difficulty)
-                        await sess.send_notification("mining.set_difficulty", (difficulty,))
+                        # Use vardiff start_difficulty for uninitialized sessions
+                        start_diff = _vardiff_mod.vardiff_manager.start_diff
+                        setattr(sess, "_share_difficulty", start_diff)
+                        await sess.send_notification("mining.set_difficulty", (start_diff,))
                     # Don't send set_difficulty - VarDiff manages this
                 else:
                     setattr(sess, "_share_difficulty", difficulty)
@@ -163,10 +165,14 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
 
         for sess in list(state.new_sessions):
             try:
-                # New sessions get the fixed difficulty initially
-                # VarDiff will adjust after first shares
-                setattr(sess, "_share_difficulty", difficulty)
-                await sess.send_notification("mining.set_difficulty", (difficulty,))
+                # New sessions: use vardiff start_difficulty if enabled, otherwise static
+                from ..stratum import vardiff as _vardiff_mod
+                if _vardiff_mod.vardiff_manager is not None:
+                    new_sess_diff = _vardiff_mod.vardiff_manager.start_diff
+                else:
+                    new_sess_diff = difficulty
+                setattr(sess, "_share_difficulty", new_sess_diff)
+                await sess.send_notification("mining.set_difficulty", (new_sess_diff,))
                 await sess.send_notification("mining.notify", job_params)
                 state.all_sessions.add(sess)
             except Exception as e:

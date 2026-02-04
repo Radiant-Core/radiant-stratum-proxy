@@ -188,6 +188,34 @@ docker compose logs -f stratum-proxy
 
 ## Advanced
 
+### Rebuilding Radiant Node
+
+The Docker setup compiles Radiant from source using [Radiant-Core](https://github.com/Radiant-Core/Radiant-Core). To rebuild with a newer version or different branch:
+
+**Rebuild with latest code:**
+```bash
+docker compose build --no-cache radiant
+docker compose up -d radiant
+```
+
+**Build a specific version/branch:**
+```bash
+# Edit .env to set the version
+RADIANT_VERSION=v2.1.0   # Or a branch name like 'main' or 'develop'
+
+# Then rebuild
+docker compose build --no-cache radiant
+docker compose up -d radiant
+```
+
+**Force complete rebuild (clears build cache):**
+```bash
+docker builder prune -f
+docker compose build --no-cache radiant
+```
+
+> **Note:** Building from source requires ~4GB RAM and takes 10-15 minutes. The compiled binaries are cached in the Docker image, so subsequent starts are instant.
+
 ### ZMQ Block Notifications
 
 The proxy uses ZMQ for instant block notifications instead of polling:

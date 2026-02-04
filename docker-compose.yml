@@ -7,6 +7,7 @@ services:
         RADIANT_VERSION: ${RADIANT_VERSION:-main}
     container_name: radiant-node-${NETWORK:-mainnet}
     restart: unless-stopped
+    stop_grace_period: 5m
     ports:
       - "${RXD_RPC_PORT:-7332}:${RXD_RPC_PORT:-7332}"
       - "${RXD_P2P_PORT:-7333}:${RXD_P2P_PORT:-7333}"
@@ -79,7 +80,7 @@ services:
       - VARDIFF_INACTIVITY_LOWER=${VARDIFF_INACTIVITY_LOWER:-90.0}
       - VARDIFF_INACTIVITY_MULTIPLES=${VARDIFF_INACTIVITY_MULTIPLES:-6.0}
       - VARDIFF_INACTIVITY_DROP_FACTOR=${VARDIFF_INACTIVITY_DROP_FACTOR:-0.5}
-      - VARDIFF_STATE_PATH=data/${NETWORK:-mainnet}/vardiff_state.json
+      - VARDIFF_STATE_PATH=data/vardiff_state.json
       - VARDIFF_WARM_START_MINUTES=${VARDIFF_WARM_START_MINUTES:-60}
       - VARDIFF_CHAIN_HEADROOM=${VARDIFF_CHAIN_HEADROOM:-0.9}
     command: ["/app/entrypoint.sh"]
