@@ -656,6 +656,16 @@ docker compose exec -u radiant radiant radiant-cli getmininginfo
 - Keep wallet backups secure
 - Monitor for unauthorized access
 
+## Discord Webhook Configuration Setup
+
+To set up Discord notifications:
+1. Create a Discord server if you don't have one
+2. Go to Server Settings > Integrations > Webhooks
+3. Click "Create Webhook" and give it a name (e.g., "Radiant Proxy Alerts")
+4. Copy the webhook URL and paste it below
+5. Uncomment the line by removing the # at the beginning
+  Example: DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1234567890/AbCdEfGhIjKlMnOpQrStUvWxYz
+
 ## File Structure
 
 ```
