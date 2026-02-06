@@ -41,6 +41,14 @@ P2P_PORT=${RXD_P2P_PORT:-$DEFAULT_P2P_PORT}
 ZMQ_PORT=${RXD_ZMQ_PORT:-$DEFAULT_ZMQ_PORT}
 ZMQ_RAW_PORT=${RXD_ZMQ_RAW_PORT:-$DEFAULT_ZMQ_RAW_PORT}
 
+# Convert boolean environment variables to 1/0 for radiant.conf
+UPNP_VALUE=0
+if [ "${RADIANT_UPNP}" = "true" ] || [ "${RADIANT_UPNP}" = "1" ]; then
+    UPNP_VALUE=1
+fi
+
+MAX_CONN=${RADIANT_MAX_CONNECTIONS:-50}
+
 # Build config with proper sections
 if [ "$NETWORK_MODE" = "testnet" ]; then
     cat > "$DATA_DIR/radiant.conf" << EOF
@@ -52,8 +60,11 @@ server=1
 listen=1
 daemon=0
 printtoconsole=1
-maxconnections=50
+maxconnections=${MAX_CONN}
 timeout=30000
+upnp=${UPNP_VALUE}
+discover=1
+dnsseed=1
 
 # RPC credentials (global)
 rpcuser=${RXD_RPC_USER}
@@ -80,8 +91,11 @@ server=1
 listen=1
 daemon=0
 printtoconsole=1
-maxconnections=50
+maxconnections=${MAX_CONN}
 timeout=30000
+upnp=${UPNP_VALUE}
+discover=1
+dnsseed=1
 
 # RPC credentials (global)
 rpcuser=${RXD_RPC_USER}

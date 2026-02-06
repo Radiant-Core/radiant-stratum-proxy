@@ -122,6 +122,8 @@ The Docker setup automatically builds Radiant from source - no need to download 
 | ------------------------------- | ---------------------------------- | ------------------ |
 | `RXD_RPC_PORT`                  | Radiant RPC port                   | 7332               |
 | `RXD_RPC_USER` / `RXD_RPC_PASS` | Radiant RPC credentials            | -                  |
+| `RADIANT_UPNP`                  | Enable UPnP for automatic port forwarding | false              |
+| `RADIANT_MAX_CONNECTIONS`       | Max peer connections to Radiant node | 50                 |
 | `STRATUM_PORT`                  | Port for miners to connect         | 54321              |
 | `STATIC_SHARE_DIFFICULTY`       | Share difficulty (GPU=1, ASIC=512) | 512.0              |
 | `USE_EASIER_TARGET`             | Use easier target for shares       | true               |
@@ -274,6 +276,8 @@ MIT License - See LICENSE file
 | `RXD_RPC_PASS`             | Radiant RPC password                                   | -                          |
 | `RXD_RPC_PORT`             | Radiant RPC port                                       | 7332                       |
 | `RXD_P2P_PORT`             | Radiant P2P port                                       | 7333                       |
+| `RADIANT_UPNP`             | Enable UPnP automatic port forwarding                  | false                      |
+| `RADIANT_MAX_CONNECTIONS`  | Maximum peer connections to node                       | 50                         |
 | `STRATUM_PORT`             | Stratum proxy port                                     | 54321                      |
 | `PROXY_SIGNATURE`          | Custom coinbase signature                              | /radiant-stratum-proxy/    |
 | `USE_EASIER_TARGET`        | Enable easier target selection                         | true                       |
@@ -289,7 +293,7 @@ MIT License - See LICENSE file
 | `DISCORD_WEBHOOK_URL`      | Discord webhook for notifications                      | (blank = disabled)         |
 | `TELEGRAM_BOT_TOKEN`       | Telegram bot token                                     | (blank = disabled)         |
 | `TELEGRAM_CHAT_ID`         | Telegram chat ID                                       | (blank = disabled)         |
-| `NTIME_ROLL`               | Seconds between job rolls (stale share tuning)         | 120                |
+| `NTIME_ROLL`               | Seconds between job rolls (stale share tuning)         | 120                        |
 
 ### Variable Difficulty Settings
 

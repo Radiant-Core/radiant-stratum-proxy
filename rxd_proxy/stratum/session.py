@@ -645,6 +645,7 @@ class StratumSession(RPCSession):
 
         # Check for duplicate share (IceRiver miner bug workaround)
         # Some IceRiver firmware versions resubmit the same share multiple times
+        # Note: We check BEFORE validation, but only add to tracker AFTER successful validation
         share_key = (job_id, extranonce2_hex, ntime_hex, nonce_hex)
         if share_key in self._submitted_shares:
             self.logger.warning(
@@ -655,9 +656,6 @@ class StratumSession(RPCSession):
             )
             # Return True to avoid rejection message - this is a valid share we already processed
             return True
-        
-        # Add to recent shares tracking
-        self._submitted_shares.append(share_key)
 
         state = self._state
 
@@ -753,6 +751,21 @@ class StratumSession(RPCSession):
         )
         share_diff = DIFF1 / max(1, hnum)
 
+        # Detect garbage hashes (IceRiver firmware bug)
+        # Valid shares should have hnum in reasonable range relative to DIFF1
+        # If share_diff is essentially 0, the hash is garbage
+        if share_diff < 0.001:
+            self.logger.warning(
+                "Garbage hash detected from %s (IceRiver bug) - job=%s, en2=%s, ntime=%s, nonce=%s, pow_hash=%s",
+                worker,
+                job_id,
+                extranonce2_hex,
+                ntime_hex,
+                nonce_hex,
+                pow_digest_le.hex()
+            )
+            return False
+
         # Accept share if it meets the target or the miner difficulty
         # Use 0.40 tolerance for solo mining (IceRiver ASICs don't perfectly
         # filter by assigned difficulty). Any share showing meaningful work
@@ -760,9 +773,12 @@ class StratumSession(RPCSession):
         if not is_block and (share_diff / sent_diff) < 0.40:
             # Share is rejected due to insufficient difficulty
             self.logger.info(
-                "Share rejected: insufficient difficulty (%.8f < %.8f)",
+                "Share rejected: insufficient difficulty (%.8f < %.8f) - hnum=%d, target=%d, header80=%s",
                 share_diff,
                 sent_diff,
+                hnum,
+                target_int,
+                header80.hex()
             )
 
             # Record rejected share in VarDiff so it can adjust downward
@@ -822,6 +838,10 @@ class StratumSession(RPCSession):
             return False
 
         block_msg = " (RXD BLOCK!)" if is_block else ""
+
+        # Add to duplicate tracking ONLY after share passes validation
+        # This prevents invalid shares from being marked as "already processed"
+        self._submitted_shares.append(share_key)
 
         # Track share using the ASSIGNED difficulty to avoid conditional upward bias
         hashrate_tracker.add_share(worker, sent_diff, accepted=True)
