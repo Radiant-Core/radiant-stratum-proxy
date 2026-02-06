@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 async def update_once(state, settings, http: ClientSession, force_update: bool = False):
-    ROLL_SECONDS = getattr(settings, "ntime_roll", 30)
+    ROLL_SECONDS = getattr(settings, "ntime_roll", 120)
 
     js = await rpc_rxd.getblocktemplate(http, settings.node_url)
     if js.get("error"):
@@ -108,6 +108,28 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
         # Use epoch timestamp as job ID
         state.job_counter = ts
 
+        # Store job snapshot for stale share validation
+        job_id = hex(ts)[2:]
+        state.job_history[job_id] = {
+            'coinbase1': state.coinbase1,
+            'coinbase2': state.coinbase2,
+            'coinbase1_nowit': state.coinbase1_nowit,
+            'coinbase2_nowit': state.coinbase2_nowit,
+            'merkle_branches': list(state.merkle_branches),
+            'version': state.version,
+            'prevHash_header': state.prevHash_header,
+            'bits_le': state.bits_le,
+            'target': state.target,
+            'height': state.height,
+            'externalTxs': list(state.externalTxs),
+        }
+        # Keep only the last 10 jobs
+        MAX_JOB_HISTORY = 10
+        if len(state.job_history) > MAX_JOB_HISTORY:
+            oldest_keys = sorted(state.job_history.keys())[:-MAX_JOB_HISTORY]
+            for k in oldest_keys:
+                del state.job_history[k]
+
         # Network difficulty (diff1-scaled) based on target
         t_int = int(state.target, 16)
         network_diff = target_to_diff1(t_int)
@@ -138,10 +160,8 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
                 if _vardiff_mod.vardiff_manager is not None:
                     sess_diff = getattr(sess, "_share_difficulty", None)
                     if sess_diff is None or sess_diff <= 0:
-                        # Use vardiff start_difficulty for uninitialized sessions
-                        start_diff = _vardiff_mod.vardiff_manager.start_diff
-                        setattr(sess, "_share_difficulty", start_diff)
-                        await sess.send_notification("mining.set_difficulty", (start_diff,))
+                        setattr(sess, "_share_difficulty", difficulty)
+                        await sess.send_notification("mining.set_difficulty", (difficulty,))
                     # Don't send set_difficulty - VarDiff manages this
                 else:
                     setattr(sess, "_share_difficulty", difficulty)
@@ -165,14 +185,10 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
 
         for sess in list(state.new_sessions):
             try:
-                # New sessions: use vardiff start_difficulty if enabled, otherwise static
-                from ..stratum import vardiff as _vardiff_mod
-                if _vardiff_mod.vardiff_manager is not None:
-                    new_sess_diff = _vardiff_mod.vardiff_manager.start_diff
-                else:
-                    new_sess_diff = difficulty
-                setattr(sess, "_share_difficulty", new_sess_diff)
-                await sess.send_notification("mining.set_difficulty", (new_sess_diff,))
+                # New sessions get the fixed difficulty initially
+                # VarDiff will adjust after first shares
+                setattr(sess, "_share_difficulty", difficulty)
+                await sess.send_notification("mining.set_difficulty", (difficulty,))
                 await sess.send_notification("mining.notify", job_params)
                 state.all_sessions.add(sess)
             except Exception as e:

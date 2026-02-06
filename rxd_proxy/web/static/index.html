@@ -147,6 +147,23 @@
           <div class="value" id="rxd-difficulty" style="font-size: 1.8em">—</div>
           <div class="unit">Network Target</div>
         </div>
+
+        <div class="stat-card" title="Connected peers on the Radiant node (inbound + outbound)">
+          <h3>Node Peers</h3>
+          <div class="value" id="peer-count" style="font-size: 1.8em">—</div>
+          <div class="unit">Connected</div>
+          <div class="subtext" id="peer-detail">In: — / Out: —</div>
+        </div>
+
+        <div class="stat-card" title="Estimated total Radiant network hashrate">
+          <h3>
+            <img src="/static/radiant-logo-darkmode.png" alt="RXD" class="chain-logo theme-logo" data-dark="/static/radiant-logo-darkmode.png" data-light="/static/radiant-logo-lightmode.png" onerror="this.style.display='none'" />
+            Net Hashrate
+          </h3>
+          <div class="value" id="network-hashrate" style="font-size: 1.8em">—</div>
+          <div class="unit" id="network-hashrate-unit">H/s</div>
+          <div class="subtext" id="network-share">Your share: —</div>
+        </div>
       </div>
 
       <div class="toolbar">
@@ -668,6 +685,46 @@
           if (ttfRxdEl) { ttfRxdEl.textContent = formatTTF(data.ttf_rxd_seconds); ttfRxdEl.title = data.ttf_rxd_seconds ? `${Math.round(data.ttf_rxd_seconds).toLocaleString()} seconds` : "No hashrate data"; }
           if (ttfRxd12hEl) { ttfRxd12hEl.textContent = formatTTF(data.ttf_rxd_12h_seconds); ttfRxd12hEl.title = data.ttf_rxd_12h_seconds ? `${Math.round(data.ttf_rxd_12h_seconds).toLocaleString()} seconds (12h avg)` : "No history data"; }
           if (ttfRxd24hEl) { ttfRxd24hEl.textContent = formatTTF(data.ttf_rxd_24h_seconds); ttfRxd24hEl.title = data.ttf_rxd_24h_seconds ? `${Math.round(data.ttf_rxd_24h_seconds).toLocaleString()} seconds (24h avg)` : "No history data"; }
+
+          // Peer count
+          const peerEl = document.getElementById("peer-count");
+          const peerDetailEl = document.getElementById("peer-detail");
+          if (peerEl && data.peer_count != null) {
+            peerEl.textContent = data.peer_count;
+            peerEl.title = `${data.peer_count} peers connected to Radiant node`;
+          }
+          if (peerDetailEl && data.peer_inbound != null) {
+            peerDetailEl.textContent = `In: ${data.peer_inbound} / Out: ${data.peer_outbound}`;
+          }
+
+          // Network hashrate
+          const netHashEl = document.getElementById("network-hashrate");
+          const netHashUnitEl = document.getElementById("network-hashrate-unit");
+          const netShareEl = document.getElementById("network-share");
+          if (netHashEl && data.network_hashrate != null) {
+            const nh = data.network_hashrate;
+            let val, unit;
+            if (nh >= 1e15) { val = (nh / 1e15).toFixed(2); unit = "PH/s"; }
+            else if (nh >= 1e12) { val = (nh / 1e12).toFixed(2); unit = "TH/s"; }
+            else if (nh >= 1e9) { val = (nh / 1e9).toFixed(2); unit = "GH/s"; }
+            else if (nh >= 1e6) { val = (nh / 1e6).toFixed(2); unit = "MH/s"; }
+            else { val = nh.toFixed(0); unit = "H/s"; }
+            netHashEl.textContent = val;
+            if (netHashUnitEl) netHashUnitEl.textContent = unit;
+            netHashEl.title = `Network hashrate: ${nh.toLocaleString()} H/s`;
+          }
+          // Calculate your share of network
+          if (netShareEl && data.network_hashrate > 0) {
+            try {
+              const minerResp = await fetch("/api/miners");
+              const minerData = await minerResp.json();
+              const yourHash = minerData.total_ema_hs || 0;
+              if (yourHash > 0) {
+                const pct = (yourHash / data.network_hashrate * 100);
+                netShareEl.textContent = `Your share: ${pct < 0.01 ? pct.toFixed(4) : pct.toFixed(2)}%`;
+              } else { netShareEl.textContent = "Your share: —"; }
+            } catch(e) { netShareEl.textContent = "Your share: —"; }
+          }
         } catch (error) { console.error("Error fetching stats:", error); }
       }
 

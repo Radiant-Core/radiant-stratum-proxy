@@ -28,6 +28,7 @@ class TemplateState:
     all_sessions: Set[RPCSession] = field(default_factory=set)
     awaiting_update: bool = False
     job_counter: int = 0
+    job_history: dict = field(default_factory=dict)  # job_id -> state snapshot
     bits_counter: int = 0
     header_prefix: Optional[bytes] = None
     bits_le: Optional[bytes] = None

@@ -639,29 +639,43 @@ class StratumSession(RPCSession):
 
         state = self._state
 
-        # Snapshot state for consistent block building
-        coinbase1_nowit_snapshot = state.coinbase1_nowit
-        coinbase2_nowit_snapshot = state.coinbase2_nowit
-        merkle_branches_snapshot = list(state.merkle_branches)
-        version_snapshot = state.version
-        prevHash_header_snapshot = state.prevHash_header  # LE bytes for header building
-        bits_le_snapshot = state.bits_le
-
-        if job_id != hex(state.job_counter)[2:]:
+        # Look up job from history for consistent state snapshots
+        current_job_id = hex(state.job_counter)[2:]
+        if job_id == current_job_id and job_id in state.job_history:
+            # Current job - use snapshot from history for consistency
+            snap = state.job_history[job_id]
+        elif job_id in state.job_history:
+            # Recent older job - miner was still working on it
+            snap = state.job_history[job_id]
+            self.logger.debug("Accepting share for recent job %s (current: %s)", job_id, current_job_id)
+        else:
             self.logger.error("Miner submitted unknown/old job %s", job_id)
             return False
 
+        # Use snapshot data for consistent validation
+        coinbase1_nowit_snapshot = snap['coinbase1_nowit']
+        coinbase2_nowit_snapshot = snap['coinbase2_nowit']
+        coinbase1_snapshot = snap['coinbase1']
+        coinbase2_snapshot = snap['coinbase2']
+        merkle_branches_snapshot = snap['merkle_branches']
+        version_snapshot = snap['version']
+        prevHash_header_snapshot = snap['prevHash_header']
+        bits_le_snapshot = snap['bits_le']
+        target_snapshot = snap['target']
+        height_snapshot = snap['height']
+        externalTxs_snapshot = snap['externalTxs']
+
         if not (
-            state.coinbase1
-            and state.coinbase2
-            and state.coinbase1_nowit
-            and state.coinbase2_nowit
+            coinbase1_snapshot
+            and coinbase2_snapshot
+            and coinbase1_nowit_snapshot
+            and coinbase2_nowit_snapshot
         ):
             self.logger.error("Coinbase parts not ready")
             return False
 
         # Additional state validation for header building
-        if not (prevHash_header_snapshot and bits_le_snapshot and state.target):
+        if not (prevHash_header_snapshot and bits_le_snapshot and target_snapshot):
             self.logger.error("Header state not ready")
             return False
 
@@ -672,7 +686,7 @@ class StratumSession(RPCSession):
         en1 = bytes.fromhex(self._extranonce1 or "")
         en2 = bytes.fromhex(extranonce2_hex)
 
-        coinbase_tx = state.coinbase1 + en1 + en2 + state.coinbase2
+        coinbase_tx = coinbase1_snapshot + en1 + en2 + coinbase2_snapshot
         coinbase_nowit = coinbase1_nowit_snapshot + en1 + en2 + coinbase2_nowit_snapshot
         coinbase_txid_le = dsha256(coinbase_nowit)
 
@@ -707,7 +721,7 @@ class StratumSession(RPCSession):
         self.logger.debug(f"Hash as int: {hnum}")
 
         # Check RXD target
-        target_int = int(state.target, 16)
+        target_int = int(target_snapshot, 16)
         is_block = hnum <= target_int
 
         # Difficulty we assigned to the miner (expected work per share)
@@ -718,13 +732,30 @@ class StratumSession(RPCSession):
         share_diff = DIFF1 / max(1, hnum)
 
         # Accept share if it meets the target or the miner difficulty
-        if not is_block and (share_diff / sent_diff) < 0.99:
+        # Use 0.40 tolerance for solo mining (IceRiver ASICs don't perfectly
+        # filter by assigned difficulty). Any share showing meaningful work
+        # is valuable for hashrate tracking and block detection.
+        if not is_block and (share_diff / sent_diff) < 0.40:
             # Share is rejected due to insufficient difficulty
             self.logger.info(
                 "Share rejected: insufficient difficulty (%.8f < %.8f)",
                 share_diff,
                 sent_diff,
             )
+
+            # Record rejected share in VarDiff so it can adjust downward
+            # (prevents death spiral where high diff → rejections → no data → stays high)
+            if _vardiff_mod.vardiff_manager is not None:
+                try:
+                    await _vardiff_mod.vardiff_manager.record_share(
+                        worker, share_difficulty=sent_diff
+                    )
+                    new_diff = await _vardiff_mod.vardiff_manager.get_difficulty(worker)
+                    if abs(new_diff - sent_diff) / max(sent_diff, 1e-9) >= 0.05:
+                        self._share_difficulty = new_diff
+                        await self.send_notification("mining.set_difficulty", (new_diff,))
+                except Exception as e:
+                    self.logger.debug("Failed to record rejected share for vardiff: %s", e)
 
             # Log rejected share asynchronously
             import time
@@ -808,7 +839,7 @@ class StratumSession(RPCSession):
                 _record_best_share_background(
                     worker=worker,
                     chain="RXD",
-                    block_height=state.height,
+                    block_height=height_snapshot,
                     share_difficulty=share_diff,
                     target_difficulty=rxd_difficulty,
                     timestamp=current_timestamp,
@@ -857,7 +888,7 @@ class StratumSession(RPCSession):
 
             async with ClientSession() as http:
                 # Build block for submission
-                tx_count = len(state.externalTxs) + 1
+                tx_count = len(externalTxs_snapshot) + 1
                 if tx_count < 0xFD:
                     tx_count_hex = tx_count.to_bytes(1, "little").hex()
                 elif tx_count <= 0xFFFF:
@@ -868,19 +899,19 @@ class StratumSession(RPCSession):
                     tx_count_hex = "ff" + tx_count.to_bytes(8, "little").hex()
 
                 coinbase_full = (
-                    state.coinbase1_nowit + en1 + en2 + state.coinbase2_nowit
+                    coinbase1_nowit_snapshot + en1 + en2 + coinbase2_nowit_snapshot
                 )
 
                 block_hex = (
                     header80.hex()
                     + tx_count_hex
                     + coinbase_full.hex()
-                    + "".join(state.externalTxs)
+                    + "".join(externalTxs_snapshot)
                 )
 
                 from ..rpc.rxd import submitblock
 
-                state.logger.info("Submitting RXD block at height %d", state.height)
+                state.logger.info("Submitting RXD block at height %d", height_snapshot)
                 state.logger.debug("RXD submit block: %s", block_hex[:200] + "...")
 
                 js = await submitblock(http, self._node_url, block_hex)
@@ -889,14 +920,14 @@ class StratumSession(RPCSession):
                     os.mkdir("./submit_history")
 
                 with open(
-                    f"./submit_history/RXD_{state.height}_{state.job_counter}.txt",
+                    f"./submit_history/RXD_{height_snapshot}_{job_id}.txt",
                     "w",
                 ) as f:
                     dump = f"=== RXD BLOCK SUBMISSION ===\n"
                     dump += f"Submission Time: {submit_time}\n"
                     dump += f"Worker: {worker}\n"
                     dump += f"Job ID: {job_id}\n"
-                    dump += f"Block Height: {state.height}\n"
+                    dump += f"Block Height: {height_snapshot}\n"
                     dump += f"Block Hash: {block_hash.hex()}\n"
                     dump += f"Extranonce1: {self._extranonce1}\n"
                     dump += f"Extranonce2: {extranonce2_hex}\n"
@@ -909,7 +940,7 @@ class StratumSession(RPCSession):
                     dump += f"Share Difficulty: {share_diff:.18f}\n"
                     dump += f"Header: {header80.hex()}\n"
                     dump += f"Block Hex Length: {len(block_hex)} chars\n"
-                    dump += f"Transaction Count: {len(state.externalTxs) + 1}\n\n"
+                    dump += f"Transaction Count: {len(externalTxs_snapshot) + 1}\n\n"
                     dump += f"RPC Response:\n{json.dumps(js, indent=2)}\n\n"
                     dump += f"Full State:\n{state.__repr__()}\n\n"
                     dump += f"Block Hex:\n{block_hex}"
@@ -924,7 +955,7 @@ class StratumSession(RPCSession):
                     # submitblock returns null on success
                     if result is None or result == "":
                         block_accepted = True
-                        block_height_for_notif = state.height
+                        block_height_for_notif = height_snapshot
                         assert block_height_for_notif is not None  # Type narrowing
 
                         # Record as best share since block was accepted
@@ -932,7 +963,7 @@ class StratumSession(RPCSession):
                             _record_best_share_background(
                                 worker=worker,
                                 chain="RXD",
-                                block_height=state.height,
+                                block_height=height_snapshot,
                                 share_difficulty=share_diff,
                                 target_difficulty=rxd_difficulty,
                                 timestamp=current_timestamp,

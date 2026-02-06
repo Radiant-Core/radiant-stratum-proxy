@@ -7,11 +7,14 @@ A stratum mining proxy for Radiant (RXD) blockchain using SHA512/256d proof-of-w
 - ✅ **SHA512/256d Mining**: Native support for Radiant's proof-of-work algorithm
 - ✅ **ZMQ Support**: Instant new block notifications
 - ✅ **Notifications**: Discord and Telegram alerts for blocks found and miner connections
-- ✅ **Web Dashboard** _(optional)_: Real-time monitoring of miners, hashrates, and blocks
+- ✅ **Web Dashboard** _(optional)_: Real-time monitoring of miners, hashrates, blocks, node peers, and network hashrate
 - ✅ **SQLite Database** _(optional)_: Historical statistics and block history
-- ✅ **Variable Difficulty** _(optional)_: Automatic difficulty adjustment per miner
+- ✅ **Variable Difficulty** _(optional)_: Automatic difficulty adjustment per miner with ASIC-optimized tuning
 - ✅ **Docker Ready**: Complete docker compose setup with health checks
 - ✅ **Flexible Difficulty**: Configurable share difficulty for any hashrate
+- ✅ **Job History**: Stale share prevention — keeps recent job snapshots so miners working on slightly older jobs aren't rejected
+- ✅ **Configurable Job Roll Interval**: `NTIME_ROLL` setting to control how often new jobs are issued (default 120s)
+- ✅ **IceRiver ASIC Support**: Tuned acceptance thresholds and VarDiff for IceRiver RX0 miners
 
 ## Quick Start
 
@@ -27,7 +30,10 @@ The Docker setup automatically builds Radiant from source - no need to download 
 
    **Linux/macOS:**
    ```bash
-   # For ASIC miners (IceRiver, etc.) - RECOMMENDED for solo mining
+   # For IceRiver RX0 miners - RECOMMENDED (optimized, <1% rejection rate)
+   cp .env.example.iceriver .env
+
+   # For other ASIC miners
    cp .env.example.asic .env
 
    # For GPU miners (testing/development)
@@ -39,7 +45,10 @@ The Docker setup automatically builds Radiant from source - no need to download 
 
    **Windows (PowerShell):**
    ```powershell
-   # For ASIC miners (IceRiver, etc.) - RECOMMENDED for solo mining
+   # For IceRiver RX0 miners - RECOMMENDED (optimized, <1% rejection rate)
+   Copy-Item .env.example.iceriver .env
+
+   # For other ASIC miners
    Copy-Item .env.example.asic .env
 
    # For GPU miners (testing/development)
@@ -83,14 +92,16 @@ The Docker setup automatically builds Radiant from source - no need to download 
 
    **Linux/macOS:**
    ```bash
-   cp .env.example.gpu .env   # For GPU miners
-   cp .env.example.asic .env  # For ASIC miners
+   cp .env.example.iceriver .env  # For IceRiver RX0 (recommended)
+   cp .env.example.asic .env      # For other ASICs
+   cp .env.example.gpu .env       # For GPU miners
    ```
 
    **Windows (PowerShell):**
    ```powershell
-   Copy-Item .env.example.gpu .env   # For GPU miners
-   Copy-Item .env.example.asic .env  # For ASIC miners
+   Copy-Item .env.example.iceriver .env  # For IceRiver RX0 (recommended)
+   Copy-Item .env.example.asic .env      # For other ASICs
+   Copy-Item .env.example.gpu .env       # For GPU miners
    ```
 
    Then edit `.env` to match your node RPC settings.
@@ -184,37 +195,13 @@ docker compose logs -f stratum-proxy
 
 **Low hashrate**: Adjust `STATIC_SHARE_DIFFICULTY` for more frequent feedback
 
+**High rejection rate ("unknown/old job")**: The proxy keeps a history of recent jobs. If rejections persist, try increasing `NTIME_ROLL` (default 120s) for less frequent job changes
+
+**High rejection rate ("insufficient difficulty")**: If using IceRiver ASICs, ensure VarDiff is enabled. The proxy uses a 40% acceptance threshold to accommodate ASIC firmware quirks. Clear `data/vardiff_state.json` to reset difficulty if miners are stuck at too-high difficulty
+
 **Build fails**: Ensure Docker has enough memory (4GB+ recommended for compilation)
 
 ## Advanced
-
-### Rebuilding Radiant Node
-
-The Docker setup compiles Radiant from source using [Radiant-Core](https://github.com/Radiant-Core/Radiant-Core). To rebuild with a newer version or different branch:
-
-**Rebuild with latest code:**
-```bash
-docker compose build --no-cache radiant
-docker compose up -d radiant
-```
-
-**Build a specific version/branch:**
-```bash
-# Edit .env to set the version
-RADIANT_VERSION=v2.1.0   # Or a branch name like 'main' or 'develop'
-
-# Then rebuild
-docker compose build --no-cache radiant
-docker compose up -d radiant
-```
-
-**Force complete rebuild (clears build cache):**
-```bash
-docker builder prune -f
-docker compose build --no-cache radiant
-```
-
-> **Note:** Building from source requires ~4GB RAM and takes 10-15 minutes. The compiled binaries are cached in the Docker image, so subsequent starts are instant.
 
 ### ZMQ Block Notifications
 
@@ -230,21 +217,33 @@ Enable automatic difficulty adjustment per miner:
 
 ```bash
 ENABLE_VARDIFF=true
-VARDIFF_TARGET_SHARE_TIME=15.0    # Target seconds between shares
-VARDIFF_MIN_DIFFICULTY=100.0      # Minimum difficulty floor
-VARDIFF_MAX_DIFFICULTY=10000000.0 # Maximum difficulty ceiling
-VARDIFF_START_DIFFICULTY=10000.0  # Initial difficulty for new miners
+VARDIFF_TARGET_SHARE_TIME=20.0    # Target seconds between shares
+VARDIFF_MIN_DIFFICULTY=256.0      # Minimum difficulty floor
+VARDIFF_MAX_DIFFICULTY=16000.0    # Maximum difficulty ceiling
+VARDIFF_START_DIFFICULTY=512.0    # Initial difficulty for new miners
 ```
 
 Additional tuning options (see `.env.example.gpu` or `.env.example.asic` for full list):
 
 ```bash
 VARDIFF_RETARGET_SHARES=20        # Shares before retargeting
-VARDIFF_RETARGET_TIME=300.0       # Max seconds before retargeting
+VARDIFF_RETARGET_TIME=180.0       # Max seconds before retargeting
 VARDIFF_UP_STEP=2.0               # Multiplier when increasing difficulty
-VARDIFF_DOWN_STEP=0.5             # Multiplier when decreasing difficulty
+VARDIFF_DOWN_STEP=0.8             # Multiplier when decreasing difficulty
 VARDIFF_STATE_PATH=data/vardiff_state.json  # Persist difficulty between restarts
 VARDIFF_CHAIN_HEADROOM=0.9        # Fraction of chain difficulty as upper cap
+```
+
+**ASIC Mining Note**: VarDiff feeds both accepted and rejected shares into the difficulty algorithm, preventing a "death spiral" where high difficulty causes rejections that prevent the algorithm from adjusting downward. The acceptance threshold is set at 40% of assigned difficulty to accommodate IceRiver ASICs that don't perfectly filter by assigned difficulty.
+
+### Job History & Stale Share Prevention
+
+The proxy maintains a history of recent job snapshots (last 10 jobs). When a miner submits a share for a job that is no longer current (e.g., a new block arrived while the miner was working), the proxy validates the share against the stored snapshot instead of rejecting it outright. This dramatically reduces "unknown/old job" rejections.
+
+The `NTIME_ROLL` environment variable controls how often new jobs are issued even without a new block (default: 120 seconds). Higher values reduce job churn and stale shares but may slightly delay transaction inclusion.
+
+```bash
+NTIME_ROLL=120  # Seconds between job rolls (higher = fewer stale shares)
 ```
 
 ### Project Structure
@@ -290,6 +289,7 @@ MIT License - See LICENSE file
 | `DISCORD_WEBHOOK_URL`      | Discord webhook for notifications                      | (blank = disabled)         |
 | `TELEGRAM_BOT_TOKEN`       | Telegram bot token                                     | (blank = disabled)         |
 | `TELEGRAM_CHAT_ID`         | Telegram chat ID                                       | (blank = disabled)         |
+| `NTIME_ROLL`               | Seconds between job rolls (stale share tuning)         | 120                |
 
 ### Variable Difficulty Settings
 
@@ -656,16 +656,6 @@ docker compose exec -u radiant radiant radiant-cli getmininginfo
 - Keep wallet backups secure
 - Monitor for unauthorized access
 
-## Discord Webhook Configuration Setup
-
-To set up Discord notifications:
-1. Create a Discord server if you don't have one
-2. Go to Server Settings > Integrations > Webhooks
-3. Click "Create Webhook" and give it a name (e.g., "Radiant Proxy Alerts")
-4. Copy the webhook URL and paste it below
-5. Uncomment the line by removing the # at the beginning
-  Example: DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1234567890/AbCdEfGhIjKlMnOpQrStUvWxYz
-
 ## File Structure
 
 ```
@@ -673,6 +663,7 @@ radiant-stratum-proxy/
 ├── docker-compose.yml       # Main compose file
 ├── .env.example.gpu         # GPU mining configuration template
 ├── .env.example.asic        # ASIC mining configuration template
+├── .env.example.iceriver    # IceRiver RX0 optimized configuration
 ├── .gitignore               # Git ignore rules
 ├── Dockerfile               # Proxy container build
 ├── Dockerfile.radiant       # Radiant node container (builds from source)

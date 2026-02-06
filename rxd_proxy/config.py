@@ -29,6 +29,7 @@ class Settings:
     enable_dashboard: bool = False
     dashboard_port: int = 8080
     enable_database: bool = False
+    ntime_roll: int = 120  # Seconds between job rolls (higher = fewer stale shares)
     # Variable difficulty (per-miner) settings
     enable_vardiff: bool = False
     vardiff_target_interval: float = 15.0
@@ -94,6 +95,7 @@ class Settings:
         self.enable_dashboard = os.getenv("ENABLE_DASHBOARD", "false").lower() == "true"
         self.dashboard_port = int(os.getenv("DASHBOARD_PORT", "8080"))
         self.enable_database = os.getenv("ENABLE_DATABASE", "false").lower() == "true"
+        self.ntime_roll = int(os.getenv("NTIME_ROLL", "120"))
         # VarDiff settings
         self.enable_vardiff = os.getenv("ENABLE_VARDIFF", "false").lower() == "true"
         try:

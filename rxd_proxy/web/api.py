@@ -445,6 +445,41 @@ async def get_stats(hours: int = 24):
         stats["current_rxd_difficulty"] = rxd_difficulty
         stats["current_height_rxd"] = state.height
 
+        # Fetch peer count and network hashrate from Radiant node
+        stats["peer_count"] = None
+        stats["peer_inbound"] = None
+        stats["peer_outbound"] = None
+        stats["network_hashrate"] = None
+        try:
+            import aiohttp
+            from ..config import Settings
+
+            _settings = Settings()
+            _rxd_url = f"http://{_settings.rpcuser}:{_settings.rpcpass}@{_settings.rpcip}:{_settings.rpcport}"
+
+            async with aiohttp.ClientSession() as _http:
+                # Get peer info
+                payload = {"jsonrpc": "1.0", "id": "peers", "method": "getpeerinfo", "params": []}
+                async with _http.post(_rxd_url, json=payload, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        peers = data.get("result", [])
+                        if isinstance(peers, list):
+                            stats["peer_count"] = len(peers)
+                            stats["peer_inbound"] = sum(1 for p in peers if p.get("inbound"))
+                            stats["peer_outbound"] = sum(1 for p in peers if not p.get("inbound"))
+
+                # Get network hashrate
+                payload = {"jsonrpc": "1.0", "id": "nethash", "method": "getnetworkhashps", "params": []}
+                async with _http.post(_rxd_url, json=payload, timeout=aiohttp.ClientTimeout(total=3)) as resp:
+                    if resp.status == 200:
+                        data = await resp.json()
+                        result = data.get("result")
+                        if result is not None:
+                            stats["network_hashrate"] = result
+        except Exception as e:
+            logger.debug(f"Could not fetch peer/network info from daemon: {e}")
+
         # Calculate Time-To-Find (TTF) estimates
         # Formula: TTF = (network_difficulty * 2^32) / hashrate_in_hs
         # Get total EMA hashrate from all miners

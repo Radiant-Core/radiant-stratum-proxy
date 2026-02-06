@@ -106,31 +106,5 @@ chown radiant:radiant "$DATA_DIR/radiant.conf"
 
 log "Configuration complete ($NETWORK_MODE), starting radiantd..."
 
-# Function to handle graceful shutdown
-shutdown_handler() {
-    log "Received shutdown signal, stopping radiantd gracefully..."
-    if [ -n "$RADIANTD_PID" ]; then
-        # Use radiant-cli stop for clean shutdown (flushes chainstate to disk)
-        su radiant -c "radiant-cli -rpcconnect=127.0.0.1 -rpcport=${RPC_PORT} stop" 2>/dev/null || true
-        # Wait for process to exit
-        wait "$RADIANTD_PID" 2>/dev/null
-    fi
-    log "radiantd stopped cleanly"
-    exit 0
-}
-
-# Trap SIGTERM and SIGINT for graceful shutdown
-trap shutdown_handler SIGTERM SIGINT
-
-# Start radiantd as radiant user in background so we can handle signals
-su radiant -c "radiantd $*" &
-RADIANTD_PID=$!
-
-log "radiantd started with PID $RADIANTD_PID"
-
-# Wait for the process (this allows trap to work)
-wait "$RADIANTD_PID"
-exit_code=$?
-
-log "radiantd exited with code $exit_code"
-exit $exit_code
+# Switch to radiant user and start radiantd with the configuration file
+exec su radiant -c "radiantd $*"

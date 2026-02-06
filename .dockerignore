@@ -49,6 +49,9 @@ logs/
 .DS_Store
 Thumbs.db
 
+# Blockchain data
+radiant-data/
+
 # Backup files
 *.bak
 *.backup
