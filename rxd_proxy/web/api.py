@@ -652,7 +652,7 @@ async def flush_hashrate():
     )
 
 
-@app.post("/api/clear_best_shares")
+@app.post("/api/best-shares/clear")
 async def clear_best_shares():
     """Clear all best shares from database and start fresh tracking."""
     try:
@@ -662,8 +662,8 @@ async def clear_best_shares():
         async with aiosqlite.connect(DB_PATH) as db:
             # Delete all best shares
             await db.execute("DELETE FROM best_shares")
-            deleted_count = db.total_changes
             await db.commit()
+            deleted_count = db.total_changes
 
         return JSONResponse(
             {

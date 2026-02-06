@@ -308,6 +308,12 @@ class StratumSession(RPCSession):
         self._extranonce1 = None
         self.logger = logging.getLogger("Stratum-Proxy")
         self._keepalive_task = None  # Keepalive task reference
+        
+        # Duplicate share tracking (for IceRiver miner bug workaround)
+        # Store recent share submissions as (job_id, extranonce2, ntime, nonce) tuples
+        # Keep last 100 shares to handle burst duplicates without memory bloat
+        from collections import deque
+        self._submitted_shares: deque = deque(maxlen=100)
         self._last_activity = None  # Track last activity time
 
         self.handlers = {
@@ -636,6 +642,22 @@ class StratumSession(RPCSession):
         # Reset activity timer on any submission
         loop = asyncio.get_event_loop()
         self._last_activity = loop.time()
+
+        # Check for duplicate share (IceRiver miner bug workaround)
+        # Some IceRiver firmware versions resubmit the same share multiple times
+        share_key = (job_id, extranonce2_hex, ntime_hex, nonce_hex)
+        if share_key in self._submitted_shares:
+            self.logger.warning(
+                "Duplicate share detected from %s: job=%s nonce=%s (IceRiver bug)",
+                worker,
+                job_id,
+                nonce_hex
+            )
+            # Return True to avoid rejection message - this is a valid share we already processed
+            return True
+        
+        # Add to recent shares tracking
+        self._submitted_shares.append(share_key)
 
         state = self._state
 
