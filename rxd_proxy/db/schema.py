@@ -701,8 +701,8 @@ async def get_stats_summary(hours: int = 24):
             (cutoff,),
         )
         row = await cursor.fetchone()
-        accepted = row[0] if row else 0
-        rejected = row[1] if row else 0
+        accepted = (row[0] or 0) if row else 0
+        rejected = (row[1] or 0) if row else 0
         total_shares = accepted + rejected
         acceptance_rate = (accepted / total_shares * 100) if total_shares > 0 else None
 

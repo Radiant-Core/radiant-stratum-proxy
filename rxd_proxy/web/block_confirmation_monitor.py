@@ -58,7 +58,8 @@ class BlockConfirmationMonitor:
                     response = await getblock(session, self.node_url, block_hash)
 
                     # JSON-RPC response is wrapped in "result" field
-                    if not response or "error" in response or response.get("error"):
+                    # Check if error field exists AND is not None
+                    if not response or (response.get("error") is not None):
                         logger.debug(f"RXD getblock error: {response}")
                         # If block not found, it's been orphaned
                         return (0, True)

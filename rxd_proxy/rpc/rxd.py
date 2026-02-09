@@ -37,7 +37,7 @@ async def getblock(session, node_url: str, block_hash: str):
         "jsonrpc": "1.0",
         "id": "stratum",
         "method": "getblock",
-        "params": [block_hash],
+        "params": [block_hash, 1],  # verbosity=1 for JSON output
     }
     async with session.post(node_url, data=json.dumps(data)) as resp:
         return await resp.json()

@@ -29,8 +29,8 @@
   --rxd-blue-5: #1F4495;
 
   /* Status badge colors */
-  --badge-accepted: #007A74;
-  --badge-rejected: #e74c3c;
+  --badge-accepted: rgba(16, 185, 129, 0.9);
+  --badge-rejected: rgba(239, 68, 68, 0.85);
   --shadow-card: 0 4px 15px rgba(0, 242, 242, 0.12);
   --shadow-logo: 0 4px 15px rgba(0, 0, 0, 0.2);
   --radius: 16px;
@@ -54,7 +54,8 @@
   --badge-rxd: #00A8DE;
   --badge-rxd-light: #00A8DE;
   --badge-rxd-medium: #007A74;
-  --badge-accepted: #004946;
+  --badge-accepted: rgba(5, 150, 105, 0.95);
+  --badge-rejected: rgba(220, 38, 38, 0.9);
   --shadow-card: 0 6px 18px rgba(0, 0, 0, 0.08);
   --shadow-logo: 0 3px 10px rgba(0, 0, 0, 0.15);
 }

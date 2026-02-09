@@ -732,13 +732,14 @@ class StratumSession(RPCSession):
 
         self.logger.debug(f"Header80 ({len(header80)} bytes): {header80.hex()}")
 
-        block_hash = dsha256(header80)[::-1]
-
         # Calculate SHA512/256d PoW hash for Radiant
         pow_digest_le = radiant_pow(header80)
         self.logger.debug(f"POW hash (LE): {pow_digest_le.hex()}")
         hnum = int.from_bytes(pow_digest_le, "little")
         self.logger.debug(f"Hash as int: {hnum}")
+        
+        # Radiant block hash is the POW hash reversed (for display purposes)
+        block_hash = pow_digest_le[::-1]
 
         # Check RXD target
         target_int = int(target_snapshot, 16)
@@ -773,12 +774,9 @@ class StratumSession(RPCSession):
         if not is_block and (share_diff / sent_diff) < 0.40:
             # Share is rejected due to insufficient difficulty
             self.logger.info(
-                "Share rejected: insufficient difficulty (%.8f < %.8f) - hnum=%d, target=%d, header80=%s",
+                "Share rejected: insufficient difficulty (%.8f < %.8f)",
                 share_diff,
                 sent_diff,
-                hnum,
-                target_int,
-                header80.hex()
             )
 
             # Record rejected share in VarDiff so it can adjust downward
