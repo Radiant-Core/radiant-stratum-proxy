@@ -19,7 +19,7 @@ class ZMQListener:
 
         Args:
             name: Human-readable name for this listener (e.g., "RXD")
-            zmq_endpoint: ZMQ endpoint URL (e.g., "tcp://127.0.0.1:28332")
+            zmq_endpoint: ZMQ endpoint URL (e.g., "tcp://127.0.0.1:29332")
             on_block_callback: Async function to call when new block is received
         """
         self.name = name

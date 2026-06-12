@@ -275,6 +275,7 @@ MIT License - See LICENSE file
 | `RXD_RPC_USER`             | Radiant RPC username                                   | radiant_user               |
 | `RXD_RPC_PASS`             | Radiant RPC password                                   | -                          |
 | `RXD_RPC_PORT`             | Radiant RPC port                                       | 7332                       |
+| `RXD_RPC_ALLOWHOST`        | Host-header allowlist for node RPC (radiantd 3.1.0+); `*` disables | radiant         |
 | `RXD_P2P_PORT`             | Radiant P2P port                                       | 7333                       |
 | `RADIANT_UPNP`             | Enable UPnP automatic port forwarding                  | false                      |
 | `RADIANT_MAX_CONNECTIONS`  | Maximum peer connections to node                       | 50                         |
@@ -286,7 +287,7 @@ MIT License - See LICENSE file
 | `LOG_LEVEL`                | Logging level (DEBUG, INFO, WARNING, ERROR)            | INFO                       |
 | `SHOW_JOBS`                | Show job updates in logs                               | false                      |
 | `ENABLE_ZMQ`               | Enable ZMQ block notifications                         | true                       |
-| `RXD_ZMQ_ENDPOINT`         | ZMQ endpoint URL                                       | tcp://radiant:28332        |
+| `RXD_ZMQ_ENDPOINT`         | ZMQ endpoint URL (must match node zmqpubhashblock)     | auto: tcp://radiant:29332 (main) / :39332 (test) |
 | `ENABLE_DASHBOARD`         | Enable web dashboard                                   | false                      |
 | `DASHBOARD_PORT`           | Web dashboard port                                     | 8080                       |
 | `ENABLE_DATABASE`          | Enable statistics database                             | false                      |

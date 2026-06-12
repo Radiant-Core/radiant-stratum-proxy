@@ -20,6 +20,9 @@ services:
       - RXD_RPC_USER=${RXD_RPC_USER}
       - RXD_RPC_PASS=${RXD_RPC_PASS}
       - RXD_RPC_PORT=${RXD_RPC_PORT:-7332}
+      # RPC Host-header allowlist (radiantd 3.1.0+): allow the proxy to reach this
+      # node by its service name. Match a custom RXD_RPC_HOST, or "*" to disable.
+      - RXD_RPC_ALLOWHOST=${RXD_RPC_ALLOWHOST:-radiant}
       - RXD_P2P_PORT=${RXD_P2P_PORT:-7333}
       - RXD_ZMQ_PORT=${RXD_ZMQ_PORT:-29332}
       - RXD_ZMQ_RAW_PORT=${RXD_ZMQ_RAW_PORT:-29333}
@@ -63,7 +66,9 @@ services:
       - STATIC_SHARE_DIFFICULTY=${STATIC_SHARE_DIFFICULTY:-512.0}
       - PROXY_SIGNATURE=${PROXY_SIGNATURE:-/radiant-stratum-proxy/}
       - ENABLE_ZMQ=${ENABLE_ZMQ:-true}
-      - RXD_ZMQ_ENDPOINT=${RXD_ZMQ_ENDPOINT:-tcp://radiant:28332}
+      # ZMQ: blank = auto-select by network (29332 mainnet / 39332 testnet) to
+      # match the node's zmqpubhashblock; set explicitly to override.
+      - RXD_ZMQ_ENDPOINT=${RXD_ZMQ_ENDPOINT:-}
       - DISCORD_WEBHOOK_URL=${DISCORD_WEBHOOK_URL}
       - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID}

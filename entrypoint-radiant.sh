@@ -41,6 +41,13 @@ P2P_PORT=${RXD_P2P_PORT:-$DEFAULT_P2P_PORT}
 ZMQ_PORT=${RXD_ZMQ_PORT:-$DEFAULT_ZMQ_PORT}
 ZMQ_RAW_PORT=${RXD_ZMQ_RAW_PORT:-$DEFAULT_ZMQ_RAW_PORT}
 
+# RPC Host-header allowlist (radiantd 3.1.0+ DNS-rebinding defense, audit H5).
+# The stratum proxy reaches this node by its Docker service name ("radiant"),
+# which is a DNS name and is rejected with HTTP 403 unless allowlisted. Override
+# RXD_RPC_ALLOWHOST to match a custom RXD_RPC_HOST, or set it to "*" to disable
+# Host validation entirely.
+RPC_ALLOWHOST=${RXD_RPC_ALLOWHOST:-radiant}
+
 # Convert boolean environment variables to 1/0 for radiant.conf
 UPNP_VALUE=0
 if [ "${RADIANT_UPNP}" = "true" ] || [ "${RADIANT_UPNP}" = "1" ]; then
@@ -74,6 +81,7 @@ rpcpassword=${RXD_RPC_PASS}
 # Testnet-specific settings
 rpcport=${RPC_PORT}
 rpcallowip=0.0.0.0/0
+rpcallowhost=${RPC_ALLOWHOST}
 rpcbind=0.0.0.0:${RPC_PORT}
 port=${P2P_PORT}
 bind=0.0.0.0:${P2P_PORT}
@@ -105,6 +113,7 @@ rpcpassword=${RXD_RPC_PASS}
 # Mainnet-specific settings
 rpcport=${RPC_PORT}
 rpcallowip=0.0.0.0/0
+rpcallowhost=${RPC_ALLOWHOST}
 rpcbind=0.0.0.0:${RPC_PORT}
 port=${P2P_PORT}
 bind=0.0.0.0:${P2P_PORT}

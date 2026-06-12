@@ -769,7 +769,14 @@ async def get_system_config():
         },
         "zmq": {
             "enabled": os.getenv("ENABLE_ZMQ", "true").lower() == "true",
-            "rxd_endpoint": os.getenv("RXD_ZMQ_ENDPOINT", "tcp://radiant:28332"),
+            "rxd_endpoint": (
+                os.getenv("RXD_ZMQ_ENDPOINT")
+                or (
+                    "tcp://radiant:39332"
+                    if os.getenv("TESTNET", "false").lower() == "true"
+                    else "tcp://radiant:29332"
+                )
+            ),
         },
         "notifications": {
             "discord": bool(os.getenv("DISCORD_WEBHOOK_URL", "").strip()),
