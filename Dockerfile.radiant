@@ -22,8 +22,11 @@ RUN apt-get update && apt-get install -y \
     help2man \
     && rm -rf /var/lib/apt/lists/*
 
-# Clone Radiant Core repository
-ARG RADIANT_VERSION=main
+# Clone Radiant Core repository.
+# Pin to the current release tag (NOT `main`) so the embedded version string and
+# consensus rules are reproducible. Override at build time with
+# `RADIANT_VERSION=<tag> docker compose build radiant` if you need a different ref.
+ARG RADIANT_VERSION=v3.1.2
 RUN git clone --depth 1 --branch ${RADIANT_VERSION} \
     https://github.com/Radiant-Core/Radiant-Core.git /radiant-src
 

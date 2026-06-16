@@ -4,7 +4,10 @@ services:
       context: .
       dockerfile: Dockerfile.radiant
       args:
-        RADIANT_VERSION: ${RADIANT_VERSION:-main}
+        # Default to the current release tag. A stale RADIANT_VERSION exported in
+        # your shell/.env (e.g. left over from a v3.1.0 deploy) STILL overrides
+        # this — unset it before rebuilding to get the pinned release.
+        RADIANT_VERSION: ${RADIANT_VERSION:-v3.1.2}
     container_name: radiant-node-${NETWORK:-mainnet}
     restart: unless-stopped
     stop_grace_period: 5m
