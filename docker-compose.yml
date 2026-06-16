@@ -12,7 +12,11 @@ services:
     restart: unless-stopped
     stop_grace_period: 5m
     ports:
-      - "${RXD_RPC_PORT:-7332}:${RXD_RPC_PORT:-7332}"
+      # RPC controls the wallet — bind the host publish to localhost ONLY. The
+      # stratum-proxy reaches the node over the internal docker network
+      # (RXD_RPC_HOST=radiant), so the host never needs RPC exposed publicly.
+      - "127.0.0.1:${RXD_RPC_PORT:-7332}:${RXD_RPC_PORT:-7332}"
+      # P2P is the only port that should be reachable from outside.
       - "[::]:${RXD_P2P_PORT:-7333}:${RXD_P2P_PORT:-7333}"
       - "0.0.0.0:${RXD_P2P_PORT:-7333}:${RXD_P2P_PORT:-7333}"
       - "29332:29332" # ZMQ hashblock
