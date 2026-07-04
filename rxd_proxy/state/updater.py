@@ -25,6 +25,43 @@ async def update_once(state, settings, http: ClientSession, force_update: bool =
     coinbase_sats_int = r["coinbasevalue"]
     target_hex = r["target"]
 
+    # Firmware-safe template cap.
+    # Some ASIC firmware cannot mine a block whose coinbase merkle branch
+    # exceeds a fixed depth (buffer sized for 2**14 = 16384 leaves) and
+    # silently stops on any template with more than ~16k transactions, which
+    # halts the chain during a mempool flood. Keep those miners producing by
+    # truncating the template to at most `max_template_txs` transactions.
+    #
+    # getblocktemplate lists transactions in topological order (every in-block
+    # ancestor precedes its descendants), so keeping a leading slice stays
+    # valid. We drop the low-priority tail and reduce the coinbase value by
+    # exactly the dropped transactions' fees, otherwise the coinbase
+    # over-claims and the block is rejected as bad-cb-amount.
+    max_txs = getattr(settings, "max_template_txs", 0)
+    if max_txs and len(txs_list) > max_txs:
+        dropped = txs_list[max_txs:]
+        try:
+            dropped_fees = sum(int(tx["fee"]) for tx in dropped)
+        except (KeyError, TypeError, ValueError):
+            # Fee data missing/malformed: capping could over-claim and make
+            # the block invalid, so hand the full template through untouched.
+            logger.warning(
+                "Template cap skipped: transaction missing 'fee'; "
+                "serving full %d-tx template",
+                len(txs_list),
+            )
+        else:
+            logger.info(
+                "Template capped: %d -> %d txs (dropped %d txs, %d photons in "
+                "fees) to stay under ASIC firmware merkle-branch limit",
+                len(txs_list),
+                max_txs,
+                len(dropped),
+                dropped_fees,
+            )
+            txs_list = txs_list[:max_txs]
+            coinbase_sats_int -= dropped_fees
+
     ts = int(time.time())
     state.bits = bits_hex
     state.version = version_int

@@ -30,6 +30,9 @@ class Settings:
     dashboard_port: int = 8080
     enable_database: bool = False
     ntime_roll: int = 120  # Seconds between job rolls (higher = fewer stale shares)
+    # Max transactions in the template handed to miners (0 = unlimited).
+    # Guards against ASIC firmware that stalls on blocks over ~16k txs.
+    max_template_txs: int = 15000
     # Variable difficulty (per-miner) settings
     enable_vardiff: bool = False
     vardiff_target_interval: float = 15.0
@@ -96,6 +99,16 @@ class Settings:
         self.dashboard_port = int(os.getenv("DASHBOARD_PORT", "8080"))
         self.enable_database = os.getenv("ENABLE_DATABASE", "false").lower() == "true"
         self.ntime_roll = int(os.getenv("NTIME_ROLL", "120"))
+        # Cap the number of transactions in the template handed to miners.
+        # Some ASIC firmware has a fixed coinbase-merkle-branch buffer (sized
+        # for 2**14 = 16384 leaves) and silently stops mining any template with
+        # more than ~16k transactions, which halts the chain during a mempool
+        # flood. 0 disables the cap; any positive value is clamped to 16383 so
+        # the coinbase merkle branch never exceeds depth 14 while enabled.
+        _max_template_txs = int(os.getenv("MAX_TEMPLATE_TXS", "15000"))
+        self.max_template_txs = (
+            0 if _max_template_txs <= 0 else min(_max_template_txs, 16383)
+        )
         # VarDiff settings
         self.enable_vardiff = os.getenv("ENABLE_VARDIFF", "false").lower() == "true"
         try:
