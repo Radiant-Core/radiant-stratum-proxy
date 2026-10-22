@@ -405,7 +405,7 @@ class StratumSession(RPCSession):
         # This allows the next miner to connect to set their address
         if not self._state.all_sessions and not self._state.new_sessions:
             self.logger.info("All miners disconnected - resetting payout address")
-            self._state.pub_h160 = None
+            self._state.pub_h160 = self._state.fixed_pub_h160
 
         try:
             result = super().connection_lost()

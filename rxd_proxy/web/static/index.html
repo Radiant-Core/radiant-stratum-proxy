@@ -206,6 +206,10 @@
                   <span style="opacity: 0.7">Connections:</span>
                   <span id="rxd-connections" style="font-weight: 600">—</span>
                 </div>
+                <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                  <span style="opacity: 0.7">Mempool:</span>
+                  <span id="rxd-mempool" style="font-weight: 600">—</span>
+                </div>
                 <div style="display: flex; justify-content: space-between">
                   <span style="opacity: 0.7">Version:</span>
                   <span id="rxd-version" style="font-weight: 600">—</span>
@@ -538,6 +542,18 @@
         }
         const connEl = document.getElementById(`${chain}-connections`);
         if (connEl) connEl.textContent = info.connections !== undefined ? `${info.connections}` : "—";
+        const mempoolEl = document.getElementById(`${chain}-mempool`);
+        if (mempoolEl) {
+          if (typeof info.mempool_txs === "number") {
+            const kb = info.mempool_bytes != null ? (info.mempool_bytes / 1024).toFixed(0) : "?";
+            mempoolEl.textContent = `${info.mempool_txs.toLocaleString()} txs (${kb} KB)`;
+            mempoolEl.title = `${info.mempool_txs.toLocaleString()} unconfirmed transactions in mempool`;
+            mempoolEl.style.color = info.mempool_txs === 0 ? "#f1c40f" : "";
+          } else {
+            mempoolEl.textContent = "—";
+            mempoolEl.style.color = "";
+          }
+        }
         const versionEl = document.getElementById(`${chain}-version`);
         if (versionEl) versionEl.textContent = info.version || "—";
         

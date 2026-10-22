@@ -20,6 +20,27 @@ def run_with_settings(settings: Settings):
 
     state = TemplateState()
 
+    # Pin payout address if configured (coinbase pays this regardless of miner usernames)
+    if settings.payout_address:
+        import base58
+
+        try:
+            decoded = base58.b58decode_check(settings.payout_address)
+            expected = [111, 196] if settings.testnet else [0, 5]
+            if decoded[0] not in expected or len(decoded[1:]) != 20:
+                raise ValueError(
+                    f"invalid address version/hash for {settings.payout_address}"
+                )
+            state.fixed_pub_h160 = decoded[1:]
+            state.pub_h160 = state.fixed_pub_h160
+            logger.info("Payout address pinned to %s", settings.payout_address)
+        except Exception as e:
+            logger.error(
+                "Failed to decode PAYOUT_ADDRESS %r: %s — falling back to miner-supplied address",
+                settings.payout_address,
+                e,
+            )
+
     async def main():
         from aiohttp import ClientSession
 

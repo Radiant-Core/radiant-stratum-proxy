@@ -8,6 +8,7 @@ class TemplateState:
     height: int = -1
     timestamp: int = -1
     pub_h160: Optional[bytes] = None
+    fixed_pub_h160: Optional[bytes] = None  # PAYOUT_ADDRESS override; restored when miners disconnect
     bits: Optional[str] = None
     target: Optional[str] = None
     headerHash: Optional[str] = None
