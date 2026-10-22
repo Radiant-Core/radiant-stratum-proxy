@@ -849,8 +849,34 @@ async def get_daemon_status():
                                 connections = "—"
                                 version = "—"
 
+                            # Mempool info
+                            mempool_txs = "—"
+                            mempool_bytes = None
+                            try:
+                                mem_payload = {
+                                    "jsonrpc": "1.0",
+                                    "id": "daemon_status",
+                                    "method": "getmempoolinfo",
+                                    "params": [],
+                                }
+                                async with session.post(
+                                    url,
+                                    json=mem_payload,
+                                    timeout=aiohttp.ClientTimeout(total=3),
+                                ) as mem_resp:
+                                    if mem_resp.status == 200:
+                                        mem_result = (
+                                            await mem_resp.json()
+                                        ).get("result", {})
+                                        mempool_txs = mem_result.get("size", "—")
+                                        mempool_bytes = mem_result.get("bytes")
+                            except:
+                                pass
+
                             return {
                                 "status": "Connected",
+                                "mempool_txs": mempool_txs,
+                                "mempool_bytes": mempool_bytes,
                                 "sync": (
                                     f"{result.get('verificationprogress', 0) * 100:.1f}%"
                                     if result.get("verificationprogress")

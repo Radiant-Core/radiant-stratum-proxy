@@ -33,6 +33,8 @@ class Settings:
     # Max transactions in the template handed to miners (0 = unlimited).
     # Guards against ASIC firmware that stalls on blocks over ~16k txs.
     max_template_txs: int = 15000
+    # If set, coinbase pays this address regardless of miner username
+    payout_address: str = ""
     # Variable difficulty (per-miner) settings
     enable_vardiff: bool = False
     vardiff_target_interval: float = 15.0
@@ -109,6 +111,7 @@ class Settings:
         self.max_template_txs = (
             0 if _max_template_txs <= 0 else min(_max_template_txs, 16383)
         )
+        self.payout_address = os.getenv("PAYOUT_ADDRESS", "")
         # VarDiff settings
         self.enable_vardiff = os.getenv("ENABLE_VARDIFF", "false").lower() == "true"
         try:

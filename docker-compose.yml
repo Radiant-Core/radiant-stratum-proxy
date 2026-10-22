@@ -98,6 +98,8 @@ services:
       - VARDIFF_STATE_PATH=data/vardiff_state.json
       - VARDIFF_WARM_START_MINUTES=${VARDIFF_WARM_START_MINUTES:-60}
       - VARDIFF_CHAIN_HEADROOM=${VARDIFF_CHAIN_HEADROOM:-0.9}
+      - MAX_TEMPLATE_TXS=${MAX_TEMPLATE_TXS:-15000}
+      - PAYOUT_ADDRESS=${PAYOUT_ADDRESS}
     command: ["/app/entrypoint.sh"]
     networks:
       - radiant-net
@@ -115,6 +117,34 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+  mempool-keeper:
+    # Keeps >=1 tx in the mempool so IceRiver RX0 miners don't stall on
+    # empty block templates. Sends a small self-transfer only when the
+    # mempool drops below MIN_MEMPOOL_TXS. Requires a funded node wallet.
+    image: radiant-stratum-proxy-stratum-proxy
+    container_name: radiant-mempool-keeper-${NETWORK:-mainnet}
+    restart: unless-stopped
+    depends_on:
+      - radiant
+    command: ["python", "/keeper/mempool_keeper.py"]
+    volumes:
+      - ./mempool_keeper.py:/keeper/mempool_keeper.py:ro
+    environment:
+      - RXD_RPC_HOST=radiant
+      - RXD_RPC_PORT=${RXD_RPC_PORT:-7332}
+      - RXD_RPC_USER=${RXD_RPC_USER}
+      - RXD_RPC_PASS=${RXD_RPC_PASS}
+      - TARGET_ADDRESS=${COLD_ADDRESS}
+      - SEND_AMOUNT=${KEEPER_SEND_AMOUNT:-0.001}
+      - FEE_RXD=${KEEPER_FEE_RXD:-0.025}
+      - CHECK_INTERVAL=${KEEPER_CHECK_INTERVAL:-60}
+      - MIN_MEMPOOL_TXS=${KEEPER_MIN_MEMPOOL_TXS:-1}
+      - COLD_ADDRESS=${COLD_ADDRESS}
+      - KEEP_BALANCE=${KEEP_BALANCE:-50}
+      - SWEEP_MIN=${KEEP_SWEEP_MIN:-1}
+    networks:
+      - radiant-net
 
 networks:
   radiant-net:
